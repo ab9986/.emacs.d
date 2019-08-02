@@ -1,0 +1,966 @@
+#+TITLE: emacs配置
+#+AUTHOR: Tommy Zhang
+#+OPTIONS: toc:1 num:nil html-style:nil TIMESTAMP:nil AUTHOR:nil email:nil 
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="./css/org-blog.css" />
+#+HTML_HEAD: <script type="text/javascript">
+#+HTML_HEAD: function mobilecss()
+#+HTML_HEAD: {if (/mobile/i.test(navigator.userAgent) || /android/i.test(navigator.userAgent)) document.body.classList.add('mobile');}
+#+HTML_HEAD: window.onload=mobilecss;</script>
+#+HTML_LINK_UP: blog.html
+#+HTML_LINK_HOME: blog.html
+* 初始化
+** 支持最小版本25.1
+#+BEGIN_SRC emacs-lisp
+(let ((minver "25.1"))
+  (when (version<= emacs-version minver)
+    (error "Your Emacs is old -- this config requires v%s or higher"
+           minver)))
+#+END_SRC
+** 初始化内存
+#+BEGIN_SRC emacs-lisp
+(setq normal-gc-cons-threshold (* 500 1024 1024))
+(let ((init-gc-cons-threshold most-positive-fixnum))
+  (setq gc-cons-threshold init-gc-cons-threshold)
+  (add-hook 'after-init-hook
+            (lambda ()
+              (setq gc-cons-threshold normal-gc-cons-threshold))))
+#+END_SRC
+
+** ab9986目录配置
+#+BEGIN_SRC emacs-lisp
+;; 配置ab9986所在文件夹路径
+(setq ab9986-first-dir (if (eq system-type 'windows-nt)
+                           (concat (substring (getenv "Home")
+                                              0
+                                              2)
+                                   "/")
+                         "~/"))
+;;年份
+(setq ab9986-year (format-time-string "%Y/"))
+
+;;设置emacs默认打开路径
+(setq default-directory "~/note/")
+(setq ab9986-default-directory "~/note/")
+;;tommy工作目录
+(setq ab9986-tommy-desktop-path "ab9986/desktop/tommy/")
+;; ab9986-tommyjob
+(setq ab9986-tommyjob-buffername "tommyjob.org.cpt")
+(setq ab9986-tommyjob (concat ab9986-default-directory "tommy/"
+                              ab9986-tommyjob-buffername))
+;;blog配置
+(setq ab9986-tommyblog-buffername "blog.org")
+(setq ab9986-tommyblog (concat ab9986-default-directory "blog/" ab9986-tommyblog-buffername))
+;;华润工作目录
+(setq ab9986-crb-desktop-path "crbworkdata/项目管理/重要事项/")
+(setq ab9986-crbjob-buffername "crbjob.org")
+(setq ab9986-crbjob (concat ab9986-default-directory "crbwork/"
+                            ab9986-crbjob-buffername))
+#+END_SRC
+* elpa配置
+#+BEGIN_SRC emacs-lisp
+(require 'package)
+(let ((versioned-package-dir (expand-file-name (format "elpa-%s.%s" emacs-major-version emacs-minor-version)
+                                               user-emacs-directory)))
+  (setq package-user-dir versioned-package-dir))
+
+(setq package-archives '(("gnu" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+                         ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+                         ("org" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")))
+(require 'cl-lib)
+
+(defun require-package (package &optional min-version no-refresh)
+  "Install given PACKAGE, optionally requiring MIN-VERSION.
+If NO-REFRESH is non-nil, the available package lists will not be
+re-downloaded in order to locate PACKAGE."
+  (when (not (package-installed-p package min-version))
+    (let* ((known (cdr (assoc package package-archive-contents)))
+           (versions (mapcar #'package-desc-version known)))
+      (if (cl-find-if (lambda (v)
+                        (version-list-<= min-version v))
+                      versions)
+          (package-install package)
+        (if no-refresh
+            (error "No version of %s >= %S is available"
+                   package min-version)
+          (package-refresh-contents)
+          (require-package package min-version t))))))
+
+(defun maybe-require-package (package &optional min-version no-refresh)
+  "Try to install PACKAGE, and return non-nil if successful.
+In the event of failure, return nil and print a warning message.
+Optionally require MIN-VERSION.  If NO-REFRESH is non-nil, the
+available package lists will not be re-downloaded in order to
+locate PACKAGE."
+  (condition-case err
+      (require-package package min-version no-refresh)
+    (error (message "Couldn't install optional package `%s': %S"
+                    package err)
+           nil)))
+(setq package-enable-at-startup nil)
+(package-initialize)
+#+END_SRC
+
+* 初始化常用package
+** 文件操作
+#+BEGIN_SRC emacs-lisp
+(require-package 'f)
+(require 'f)
+#+END_SRC
+** 字符串操作
+#+BEGIN_SRC emacs-lisp
+(require-package 's)
+(require 's)
+#+END_SRC
+
+** 写作
+#+BEGIN_SRC emacs-lisp
+(require-package 'writeroom-mode)
+#+END_SRC
+** graphviz
+#+BEGIN_SRC emacs-lisp
+(require-package 'graphviz-dot-mode)
+#+END_SRC
+** htmlize
+#+BEGIN_SRC emacs-lisp
+(require-package 'htmlize)
+#+END_SRC
+
+** dsvn
+#+BEGIN_SRC emacs-lisp
+(require-package 'dsvn)
+(require 'dsvn)
+#+END_SRC 
+
+
+* 编码格式
+自动侦测编码格式
+#+BEGIN_SRC emacs-lisp
+(require 'unicad)
+#+END_SRC
+
+
+* 窗体配置
+** 窗体样式
+#+BEGIN_SRC emacs-lisp
+(when (fboundp 'tool-bar-mode)
+  (tool-bar-mode -1))
+(when (fboundp 'set-scroll-bar-mode)
+  (set-scroll-bar-mode nil))
+(when (fboundp 'menu-bar-mode)
+  (menu-bar-mode -1))
+
+(let ((no-border '(internal-border-width . 0)))
+  (add-to-list 'default-frame-alist no-border)
+  (add-to-list 'initial-frame-alist no-border))
+
+#+END_SRC
+** 窗体名称
+#+BEGIN_SRC emacs-lisp
+(setq frame-title-format '((:eval (if (buffer-file-name)
+                                      (abbreviate-file-name (buffer-file-name))
+                                    "%b"))))
+#+END_SRC
+** 字体配置
+#+BEGIN_SRC emacs-lisp
+(require-package 'font-utils)
+(when (font-utils-exists-p "YaHei Consolas Hybrid")
+  (progn
+    (add-to-list 'default-frame-alist
+                 '(font . "YaHei Consolas Hybrid-12.0"))
+    (set-face-attribute 'default t :font "YaHei Consolas Hybrid-12.0")))
+#+END_SRC
+** 设置换行符和高亮光标的当前行
+#+BEGIN_SRC emacs-lisp
+(when (display-graphic-p)
+  (progn
+    ;; 高亮光标的当前行
+    (global-hl-line-mode 1)
+    ;;设置换行的图标
+    (define-fringe-bitmap 'right-curly-arrow
+      [#b111110000 #b000001000 #b000001000 #b000001000
+                   #b000001000 #b000001000 #b000001000 #b000001000
+                   #b000001000 #b001001000 #b011001000 #b111110000
+                   #b011000000 #b001000000])
+    (define-fringe-bitmap 'left-curly-arrow
+      [#b000011111 #b000100000 #b000100000 #b000100000
+                   #b000100000 #b000100000 #b000100000 #b000100000
+                   #b000100000 #b000100100 #b000100110 #b000011111
+                   #b000000110 #b000000100])))
+#+END_SRC
+*** yes和no命令简化
+#+BEGIN_SRC emacs-lisp
+(defalias 'yes-or-no-p 'y-or-n-p)
+#+END_SRC
+** Tab配置
+#+BEGIN_SRC emacs-lisp
+;;去除TAB
+(setq-default indent-tabs-mode nil)
+#+END_SRC
+
+* 编程配置
+** elisp代码格式化
+#+BEGIN_SRC emacs-lisp
+;;格式化elisp代码，可以使用命令srefactor-lisp-format-buffer
+(require-package 'srefactor)
+(require 'srefactor-lisp)
+#+END_SRC
+** 代码折叠
+#+BEGIN_SRC emacs-lisp
+(require-package 'origami)
+;;补充快捷键
+#+END_SRC
+** 高亮括号
+#+BEGIN_SRC emacs-lisp
+(show-paren-mode 1)
+#+END_SRC
+** 其他
+#+BEGIN_SRC emacs-lisp
+(require-package 'company-quickhelp)
+(require-package 'elisp-slime-nav)
+(require-package 'smartparens)
+;; 用company-mode
+(dolist (hook '(emacs-lisp-mode-hook ielm-mode-hook))
+  (add-hook hook
+            (lambda ()
+              (smartparens-mode)
+              (company-mode)
+              (company-quickhelp-mode)
+              (elisp-slime-nav-mode))))
+#+END_SRC
+** 字符串匹配
+#+BEGIN_SRC emacs-lisp
+(require 'lazy-search)
+(global-set-key (kbd "C-n")
+                'lazy-search)
+(require-package 'anzu)
+(global-anzu-mode +1)
+(global-set-key (kbd "C-r")
+                'anzu-query-replace)
+
+#+END_SRC
+
+
+** rg搜索
+#+BEGIN_SRC emacs-lisp
+(require-package 'deadgrep)
+#+END_SRC
+
+** 代码选中
+#+BEGIN_SRC emacs-lisp
+(require-package 'expand-region)
+(global-set-key (kbd "C-=")
+                'er/expand-region)
+#+END_SRC
+
+** fd搜索
+#+BEGIN_SRC emacs-lisp
+(require 'deadfd)
+#+END_SRC
+
+* 翻译配置
+** 词典
+#+BEGIN_SRC emacs-lisp
+(require-package 'bing-dict)
+(global-set-key (kbd "C-c o")
+                'bing-dict-brief)
+(setq bing-dict-add-to-kill-ring t)
+(setq bing-dict-vocabulary-save t)
+(setq bing-dict-vocabulary-file (concat ab9986-default-directory "/note/tommy/vocabulary.org"))
+#+END_SRC
+
+* helm配置
+#+BEGIN_SRC emacs-lisp
+(require-package 'helm)
+;;(require-package 'helm-org-rifle)
+;;(require-package 'helm-ag)
+;;(global-set-key (kbd "C-x C-a") 'helm-org-rifle)
+
+(global-set-key (kbd "M-x")
+                'helm-M-x)
+(global-set-key (kbd "C-x C-m")
+                'helm-M-x)
+(global-set-key (kbd "M-y")
+                'helm-show-kill-ring)
+(global-set-key (kbd "C-x b")
+                'helm-mini)
+(global-set-key (kbd "C-x C-b")
+                'helm-buffers-list)
+(global-set-key (kbd "C-x C-f")
+                'helm-find-files)
+(global-set-key (kbd "C-h f")
+                'helm-apropos)
+(global-set-key (kbd "C-h r")
+                'helm-info-emacs)
+(global-set-key (kbd "C-h C-l")
+                'helm-locate-library)
+(global-set-key (kbd "C-s")
+                'helm-occur)
+(global-set-key (kbd "C-c h h")
+                'helm-comint-input-ring) ;; search history for shell
+(global-set-key (kbd "M-s")
+                'helm-org-in-buffer-headings)
+(setq helm-ff-auto-update-initial-value t)
+;;配置helm-org-in-buffer-headings显示完整路径
+(setq helm-org-format-outline-path t)
+(helm-mode 1)
+(require 'helm-find)
+(defun helm-fd ()
+  (interactive)
+  (helm :sources (helm-build-async-source "fd"
+                   :header-name (lambda (name)
+                                  (format "%s in [%s]"
+                                          name
+                                          (helm-default-directory))):candidates-process
+                   (lambda ()
+                     (let ((process-connection-type nil))
+                       (let ((proc (apply #'start-process
+                                          "helm-fd"
+                                          helm-buffer
+                                          "fd"
+                                          (split-string helm-pattern))))
+                         (set-process-sentinel proc #'ignore)
+                         proc)))
+                   :persistent-action 'helm-ff-kill-or-find-buffer-fname
+                   :action 'org-open-file-with-system
+                   :help-message 'helm-generic-file-help-message
+                   :keymap helm-find-map
+                   :candidate-number-limit 9999):buffer
+                   "*helm fd*"))
+#+END_SRC
+
+
+* org-mode配置
+#+BEGIN_SRC emacs-lisp
+(require 'org)
+#+END_SRC
+** 配置org的路径变量
+#+BEGIN_SRC emacs-lisp
+;;跟进current-buffer的buffername获取附件路径
+(defun ab9986-get-org-attach-dir ()
+  "get org attach by buffername of current buffer"
+  (let ((current-buffer-name (buffer-name (current-buffer))))
+    (cond
+     ((string= current-buffer-name ab9986-tommyjob-buffername)
+      (concat ab9986-first-dir ab9986-tommy-desktop-path))
+     ((string= current-buffer-name ab9986-crbjob-buffername)
+      (concat ab9986-first-dir ab9986-crb-desktop-path))
+     (t (error "not support buffer %s" current-buffer-name)))))
+#+END_SRC
+** org链接打开配置
+#+BEGIN_SRC emacs-lisp
+;;设置所有的.org 打开默认为 utf-8
+(modify-coding-system-alist 'file "\\.org\\'"
+                            'utf-8)
+(when (or (eq system-type 'cygwin)
+          (eq system-type 'windows-nt))
+  ;;org-mode时打开文件时默认win系统打开
+  (setq org-file-apps '()))
+(add-to-list 'org-file-apps
+             '("\\.org\\'" . emacs))
+(defun org-ab9986-default-apps ()
+  "Return the default applications for this operating system."
+  (cond
+   ((eq system-type 'darwin) org-file-apps-defaults-macosx)
+   ((or (eq system-type 'windows-nt)
+        (eq system-type 'cygwin)) org-file-apps-defaults-windowsnt)
+   (t org-file-apps-defaults-gnu)))
+(setq org-default-apps 'org-ab9986-default-apps)
+#+END_SRC
+** org捕捉配置
+#+BEGIN_SRC emacs-lisp
+;; 自动捕捉任务
+(global-set-key (kbd "C-c c")
+                'org-capture)
+(defun ab9986-tommy-template ()
+  (let ((time-string (format-time-string "%Y%m%d%H%M")))
+    (concat "* TODO " time-string "-%?\n  :PROPERTIES:\n  :ATTACH_DIR: "
+            "\n  :END:\n  任务日期：%T\n")))
+(defun ab9986-crb-template ()
+  (let ((time-string (format-time-string "%Y%m%d%H%M")))
+    (concat "* TODO " time-string "-%?\n  :PROPERTIES:\n  :ATTACH_DIR: "
+            "\n  :END:\n  任务日期：%T\n")))
+(defun ab9986-blog-template ()
+  (let ((time-string (format-time-string "%Y%m%d")))
+    (concat "* " time-string "-%?\n ")))
+;;:prepend t 放在第一行
+;;:empty-lines 1 插入空二行
+;;:jump-to-captured t 跳到插入地方
+(setq org-capture-templates `(("b" "blog"
+                               entry
+                               (file ab9986-tommyblog)
+                               (function ab9986-blog-template)
+                               :jump-to-captured t
+                               :prepend t
+                               :empty-lines-before 1
+                               :empty-lines-after 3)
+                              ("c" "crbjob"
+                               entry
+                               (file+headline ab9986-crbjob "job")
+                               (function ab9986-crb-template)
+                               :jump-to-captured t
+                               :prepend t
+                               :empty-lines-before 1
+                               :empty-lines-after 3)
+                              ("t" "tommyjob"
+                               entry
+                               (file+headline ab9986-tommyjob "job")
+                               (function ab9986-tommy-template)
+                               :jump-to-captured t
+                               :prepend t
+                               :empty-lines-before 1
+                               :empty-lines-after 3)))
+
+#+END_SRC
+
+** org-babel配置
+#+BEGIN_SRC emacs-lisp
+(setq org-plantuml-jar-path (concat ab9986-first-dir "ab9986/collect/core/plantuml/plantuml.jar"))
+;;c-c c-c 会计算结果
+(setq org-confirm-babel-evaluate nil)
+(org-babel-do-load-languages 'org-babel-load-languages
+                             '((emacs-lisp . t)
+                               (calc . t)
+                               (plantuml . t)
+                               (dot . t)))
+#+END_SRC
+** org导出配置
+#+BEGIN_SRC emacs-lisp
+(setq org-support-shift-select t)
+;;设置 org导出默认为zh-CN
+(setq org-export-default-language "zh-CN")
+
+;;所有 org 文件不转义 _ 字符
+(setq org-export-with-sub-superscripts nil)
+;;所有 org 文件不转义特殊字符
+(setq org-export-with-special-strings nil)
+
+;;设置作者
+(setq org-export-with-author "Tommy Zhang")
+;;设置作者邮箱
+(setq org-export-with-email 'ab9986@qq.com)
+;;使用换行符
+(setq org-export-preserve-breaks t)
+
+;;
+(setq-default org-display-custom-times t)
+(setq org-time-stamp-custom-formats '("<%Y年%m月%d日>" . "<%Y年%m月%d日 %H:%M>"))
+
+;;(setq ab9986-publishing-directory (concat ab9986-first-dir "ab9986/ab9986.github.io/"))
+(setq org-publish-project-alist '(
+                                  ;; ... add all the components here (see below)...
+                                  ("org-blogs" :base-directory "~/note/blog/"
+                                   :base-extension "org"
+                                   :publishing-directory "D:/ab9986/ab9986.github.io/"
+                                   :html-head "<link rel=\"stylesheet\" type=\"text/css\" href=\"./css/org-blog.css\"/>"
+                                   :recursive t
+                                   :publishing-function org-html-publish-to-html
+                                   :auto-preamble t
+                                   :timestamp nil)))
+(require 'ox-html)
+(setq org-html-style-default nil)
+(setq org-html-scripts nil)
+(setq org-html-mathjax-template "")
+(setq org-html-validation-link nil) 
+#+END_SRC
+
+
+** 附件配置
+#+BEGIN_SRC emacs-lisp
+(require 'org-attach)
+;;c-c w 第二级标题 
+(setq org-refile-targets '((nil :maxlevel .
+                                2)))
+
+(defun ab9986-open-org-attach ()
+  "Show the attachment directory of the current task.
+This will attempt to use an external program to show the directory."
+  (interactive)
+  (setq ab9986-cursor-position-name "ab9986-cursor-position")
+  (bookmark-set ab9986-cursor-position-name)
+  (setq ab9986-level (org-element-property :level (org-element-at-point)))
+  (setq ab9986-jump-p nil)
+  (setq ab9986-level3-p nil)
+  (setq ab9986-title3 nil)
+  (setq ab9986-attach-dir3 nil)
+  (setq ab9986-level4-p nil)
+  (setq ab9986-title4 nil)
+  (setq ab9986-attach-dir4 nil)
+  (when (not ab9986-level)
+    (org-back-to-heading)
+    (setq ab9986-jump-p t))
+  (setq ab9986-level (org-element-property :level (org-element-at-point)))
+  (when (and ab9986-level
+             (= ab9986-level 4))
+    (setq ab9986-title4 (org-element-property :title (org-element-at-point)))
+    (setq ab9986-attach-dir4 (org-entry-get nil "ATTACH_DIR"))
+    (org-up-heading-safe)
+    (setq ab9986-jump-p t)
+    (setq ab9986-level4-p t))
+  (setq ab9986-level (org-element-property :level (org-element-at-point)))
+  (when (and ab9986-level
+             (= ab9986-level 3))
+    (setq ab9986-title3 (org-element-property :title (org-element-at-point)))
+    (setq ab9986-attach-dir3 (org-entry-get nil "ATTACH_DIR"))
+    (org-up-heading-safe)
+    (setq ab9986-jump-p t)
+    (setq ab9986-level3-p t))
+  (setq ab9986-level (org-element-property :level (org-element-at-point)))
+  (setq ab9986-title (org-element-property :title (org-element-at-point)))
+  (setq ab9986-attach-dir (org-entry-get nil "ATTACH_DIR"))
+  (when (and ab9986-level
+             ab9986-title
+             ab9986-attach-dir
+             (= ab9986-level 2))
+    (if (string= (string-trim ab9986-attach-dir)
+                 "")
+        (if (and (> (length ab9986-title) 4)
+                 (> (string-to-number (substring ab9986-title 0 4)) 2000))
+            (setq ab9986-attach-dir (concat (ab9986-get-org-attach-dir)
+                                            (substring ab9986-title 0 4)
+                                            "/"
+                                            ab9986-title))
+          (setq ab9986-attach-dir (concat (ab9986-get-org-attach-dir)
+                                          ab9986-title)))
+      (setq ab9986-attach-dir (concat (ab9986-get-org-attach-dir)
+                                      "/"
+                                      ab9986-attach-dir)))
+    (when (and ab9986-level3-p ab9986-title3 ab9986-attach-dir3)
+      (if (string= (string-trim ab9986-attach-dir3)
+                   "")
+          (setq ab9986-attach-dir (concat ab9986-attach-dir "/" ab9986-title3))
+        (setq ab9986-attach-dir (concat (ab9986-get-org-attach-dir)
+                                        "/"
+                                        ab9986-attach-dir3))))
+    (when (and ab9986-level4-p ab9986-title4 ab9986-attach-dir4)
+      (if (string= (string-trim ab9986-attach-dir4)
+                   "")
+          (setq ab9986-attach-dir (concat ab9986-attach-dir "/" ab9986-title4))
+        (setq ab9986-attach-dir (concat (ab9986-get-org-attach-dir)
+                                        "/"
+                                        ab9986-attach-dir4))))
+    (org-attach-check-absolute-path ab9986-attach-dir)
+    (if (not (file-directory-p ab9986-attach-dir))
+        (make-directory ab9986-attach-dir t))
+    (and (file-exists-p ab9986-attach-dir)
+         ab9986-attach-dir)
+    (org-open-file ab9986-attach-dir))
+  (when ab9986-jump-p
+    (bookmark-jump ab9986-cursor-position-name))
+  (bookmark-delete ab9986-cursor-position-name)
+  (delete-dups bookmark-history))
+(global-set-key (kbd "C-f")
+                'ab9986-open-org-attach)
+
+
+#+END_SRC
+** org加密
+#+BEGIN_SRC emacs-lisp
+(require 'ps-ccrypt)
+#+END_SRC
+
+** table
+*** 查看表格折叠内容
+不默认查看表格超长模式，执行org-table-follow-field-mode，开启查看表格超出字段
+#+BEGIN_SRC emacs-lisp
+(require 'org-table)
+(setq org-table-exit-follow-field-mode-when-leaving-table
+      nil)
+
+(when (display-graphic-p)
+  ;; 自动换行和查看表格超长模式
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (setq truncate-lines nil)
+              ;;(require 'org-table)
+              ;;(org-table-follow-field-mode t)
+              )))
+#+END_SRC
+*** 离开表格自动关闭显示列内容小窗
+;;保存桌面时，将ab9986-tommyjob-buffername的buffer关闭
+#+BEGIN_SRC emacs-lisp
+(defadvice org-table-follow-fields-with-editor
+    (before ab9986-kill-org-table-edit-field activate)
+  (let ((buffer (get-buffer "*Org Table Edit Field*")))
+    (when (and (not (org-at-table-p))
+               buffer
+               (not (string= (buffer-name (current-buffer))
+                             "*Org Table Edit Field*")))
+      (delete-other-windows)
+      (kill-buffer buffer))))
+#+END_SRC
+
+** 导出
+#+BEGIN_SRC emacs-lisp
+(require-package 'ox-pandoc)
+#+END_SRC
+
+#+BEGIN_SRC example
+(defun ox-export-to-docx-and-open ()
+  "Export the current org file as a docx via markdown."
+  (interactive)
+  (let* (
+         ;; this is probably a full path
+         (current-file (buffer-file-name))
+         (basename (file-name-sans-extension current-file))
+         (docx-file (concat basename ".docx")))
+    (save-buffer)
+    (when (file-exists-p docx-file)
+      (delete-file docx-file))
+    (shell-command (format "pandoc -s  %s -o %s" current-file
+                           docx-file))
+    (org-open-file docx-file
+                   '(16))))
+
+#+END_SRC
+
+*** 导出目录
+#+BEGIN_SRC emacs-lisp
+(defvar org-export-directory (concat ab9986-first-dir "/ab9986/ab9986.github.io/"))
+
+(defun org-export-output-file-name--set-directory (orig-fn extension &optional subtreep pub-dir)
+  (setq pub-dir (or pub-dir org-export-directory))
+  (funcall orig-fn extension subtreep pub-dir))
+(advice-add 'org-export-output-file-name :around 'org-export-output-file-name--set-directory)
+#+END_SRC
+
+
+** org-refile配置
+调用移动heading,放在上一级首位
+#+BEGIN_SRC emacs-lisp
+(setq org-reverse-note-order t)
+#+END_SRC
+** android阅读配置
+
+
+* 主题
+#+BEGIN_SRC emacs-lisp
+(require-package 'spacemacs-theme)			 
+(load-theme 'spacemacs-light t)
+;;状态栏
+(require-package 'spaceline)
+(require 'spaceline-config)
+(spaceline-spacemacs-theme)
+#+END_SRC
+* 自定义主题
+#+BEGIN_SRC emacs-lisp
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ ;;helm光标行高亮
+ '(helm-selection ((t (:background "darkseagreen2"))))
+ '(highlight ((t (:background "darkseagreen2"))))
+ ;;光标所在行高亮
+
+ '(hl-line ((t (:background "darkseagreen2"))))
+ ;;选中行颜色
+
+ '(region ((t (:background "lightgoldenrod2"))))
+ ;;匹配颜色
+
+ '(helm-match-item ((t (:background "magenta3" :foreground "lightskyblue1"))))
+ ;;输入匹配
+
+ '(helm-match ((t (:foreground "#b00000"))))
+ '(lazy-search-highlight-current ((t (:background "magenta3" :foreground "lightskyblue1"))))
+ '(lazy-search-highlight-background ((t (:foreground "#b00000"))))
+ ;;匹配选择中
+
+ '(helm-selection-line ((t (:background "darkseagreen2")))))
+
+#+END_SRC
+
+* 输入法
+目前词库采用pyim-bigdict.pyim，可以参考https://github.com/tumashu/pyim-bigdict
+这个词库非常不错的选择，基本可以满足我的需求。
+#+BEGIN_SRC emacs-lisp
+(require-package 'posframe)
+;;https://github.com/tumashu/pyim
+;; 中文输入法
+(require-package 'pyim)
+(require 'pyim)
+;; 拼音词库设置，五笔用户 *不需要* 此行设置
+(require-package 'pyim-basedict)
+(require 'pyim-basedict)
+;; 2兆词库
+(pyim-basedict-enable)  
+;; 我使用全拼
+(setq pyim-default-scheme 'quanpin)
+(setq default-input-method "pyim")
+
+
+;; 使用 pupup-el 来绘制选词框
+(setq pyim-page-tooltip 'posframe)
+
+;; 选词框显示6个候选词
+(setq pyim-page-length 9)
+;; 设置 pyim 探针设置，这是 pyim 高级功能设置，可以实现 *无痛* 中英文切换 :-)
+;; 我自己使用的中英文动态切换规则是：
+;; 1. 光标只有在注释里面时，才可以输入中文。
+;; 2. 光标前是汉字字符时，才能输入中文。
+;; 3. 使用 M-j 快捷键，强制将光标前的拼音字符串转换为中文。
+(require 'pyim-probe)
+(setq-default pyim-english-input-switch-functions '(pyim-probe-dynamic-english pyim-probe-isearch-mode
+                                                                               pyim-probe-program-mode pyim-probe-org-structure-template))
+
+(setq-default pyim-punctuation-half-width-functions '(pyim-probe-punctuation-line-beginning pyim-probe-punctuation-after-punctuation))
+(global-set-key (kbd "M-j")
+                'pyim-convert-string-at-point)
+(when (display-graphic-p)
+  (pyim-restart-1 t))
+(add-hook 'after-change-major-mode-hook
+          (lambda ()
+            (when (display-graphic-p)
+              (run-with-idle-timer 1
+                                   nil
+                                   #'(lambda ()
+                                       (activate-input-method default-input-method))))))
+
+#+END_SRC
+
+* 历史配置
+#+BEGIN_SRC emacs-lisp
+;; save a list of open files in ~/.emacs.d/.emacs.desktop
+
+(defun ab9986-time-subtract-millis (b a)
+  (* 1000.0
+     (float-time (time-subtract b a))))
+(setq desktop-path (list user-emacs-directory)
+      desktop-auto-save-timeout
+      600)
+(desktop-save-mode 1)
+
+(defadvice desktop-read
+    (around time-restore activate)
+  (let ((start-time (current-time)))
+    (prog1 ad-do-it
+      (message "Desktop restored in %.2fms"
+               (ab9986-time-subtract-millis (current-time)
+                                            start-time)))))
+
+(defadvice desktop-create-buffer
+    (around time-create activate)
+  (let ((start-time (current-time))
+        (filename (ad-get-arg 1)))
+    (prog1 ad-do-it
+      (message "Desktop: %.2fms to restore %s"
+               (ab9986-time-subtract-millis (current-time)
+                                            start-time)
+               (when filename
+                 (abbreviate-file-name filename))))))
+;;保存桌面时，将ab9986-tommyjob-buffername的buffer关闭
+(defadvice desktop-save
+    (before ab9986-kill-tommyjob activate)
+  (let ((buffer (get-buffer ab9986-tommyjob-buffername)))
+    (when buffer
+      (progn
+        (with-current-buffer buffer
+          (save-buffer))
+        (kill-buffer buffer)))))
+;;取消自动desktop-save保存
+(setq desktop-auto-save-timeout 0)
+(setq ab9986-close-tommjob-time nil)
+;;设置不使用弹框
+(setq use-dialog-box nil)
+;;当buffer-tommyjob.org.cpt,每半个小时询问是否关闭
+(defun ab9986-close-tommyjob-when-not-current ()
+  (let ((buffer (get-buffer ab9986-tommyjob-buffername)))
+    (when buffer
+      (when (y-or-n-p-with-timeout (format "close %s" ab9986-tommyjob-buffername)
+                                   60
+                                   t)
+        ;;(message "%s close  buffer %s"
+        ;;         (format-time-string "%Y-%m-%d %H:%M")
+        ;;         ab9986-tommyjob-buffername)
+        (with-current-buffer buffer
+          (save-buffer))
+        (kill-buffer buffer)
+        (when ab9986-close-tommjob-time
+          (cancel-timer ab9986-close-tommjob-time)
+          (setq ab9986-close-tommjob-time nil))))
+    (when (and (not buffer)
+               ab9986-close-tommjob-time)
+      (cancel-timer ab9986-close-tommjob-time)
+      (setq ab9986-close-tommjob-time nil))))
+;;每隔20分钟,检测是否关闭tommyjob.org.cpt的buffer
+(add-hook 'org-mode-hook
+          (lambda ()
+            (if (get-buffer ab9986-tommyjob-buffername)
+                (when (not ab9986-close-tommjob-time)
+                  ;;(message "%s open  buffer %s"
+                  ;;         (format-time-string "%Y-%m-%d %H:%M")
+                  ;;         ab9986-tommyjob-buffername)
+                  (setq ab9986-close-tommjob-time (run-with-timer 1200 1200 'ab9986-close-tommyjob-when-not-current)))
+              (when ab9986-close-tommjob-time
+                (cancel-timer ab9986-close-tommjob-time)
+                (setq ab9986-close-tommjob-time nil)))))
+;;----------------------------------------------------------------------------
+;; Restore histories and registers after saving
+;;----------------------------------------------------------------------------
+(setq-default history-length 10)
+(savehist-mode t)
+;; save a bunch of variables to the desktop file
+;; for lists specify the len of the maximal saved data also
+(setq desktop-globals-to-save (append '((extended-command-history . 30)
+                                        (file-name-history . 30)
+                                        (helm-find-files-history . 30)
+                                        (org-refile-history . 30))))
+#+END_SRC
+* 自定义脚本
+** 激活upcase-region和downcase-region
+#+BEGIN_SRC emacs-lisp
+(put 'upcase-region 'disabled nil) 
+(put 'downcase-region 'disabled nil) 
+#+END_SRC
+** 加密
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-encrypt (password)
+  (let ((password (regexp-quote (md5 password))))
+    (concat (substring password 3 4)
+            (substring password 6 7)
+            (substring password 9 10)
+            (substring password 12 13)
+            (substring password 19 20)
+            (substring password 22 23)
+            (substring password 25 26)
+            (substring password 28 29))))
+#+END_SRC
+** 解压与压缩
+*** 删除指定文件夹的7z压缩包
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-delete7zfile (dir)
+  (mapcar #'(lambda (filename)
+              (f-delete filename))
+          (directory-files dir t ".7z$")))
+#+END_SRC
+
+*** 压缩指定目录文件夹
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-7zdir (dir todir suffix encryption &optional password)
+  (mapcar #'(lambda (filename)
+              (cond
+               ((and (f-directory? filename)
+                     (not (s-ends-with? ".svn" filename t))
+                     (not (s-ends-with? ".git" filename t))
+                     (not (f-exists? (concat todir
+                                             "/"
+                                             (f-filename filename)
+                                             suffix))))
+                (progn
+                  (print (concat "正在压缩" filename))
+                  (cond
+                   ((or (s-equals? suffix ".7z")
+                        (s-equals? suffix ".zip"))
+                    (ab9986-7z filename
+                               (concat todir
+                                       "/"
+                                       (f-filename filename)
+                                       suffix)
+                               encryption
+                               password))
+                   ((s-equals? suffix ".exe")
+                    (ab9986-7zexe filename
+                                  (concat todir
+                                          "/"
+                                          (f-filename filename)
+                                          suffix)
+                                  encryption
+                                  password)))))))
+          (directory-files dir t "^\\([^.]\\|\\.[^.]\\|\\.\\..\\)")))
+#+END_SRC
+
+*** 压缩指定目录文件夹
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-7zfile (dir todir encryption &optional password)
+  (mapcar #'(lambda (filename)
+              (cond
+               ((and (f-file? filename)
+                     (not (s-ends-with? ".7z" filename t))
+                     (not (s-ends-with? ".zip" filename t))
+                     (not (s-ends-with? ".rar" filename t))
+                     (not (f-exists? (concat todir
+                                             "/"
+                                             (f-filename filename)
+                                             ".7z"))))
+                (progn
+                  (print (concat "正在压缩" filename))
+                  (ab9986-7z filename
+                             (concat todir
+                                     "/"
+                                     (f-filename filename)
+                                     ".7z")
+                             encryption
+                             password)))))
+          (directory-files dir t)))
+#+END_SRC
+*** 解压指定目录文件夹
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-un7zfile (dir todir encryption &optional password)
+  (mapcar #'(lambda (filename)
+              (cond
+               ((s-ends-with? ".7z" filename t)
+                (progn
+                  (print (concat "正在解压" filename))
+                  (ab9986-un7z filename todir encryption password)))))
+          (directory-files dir t "^\\([^.]\\|\\.[^.]\\|\\.\\..\\)")))
+
+#+END_SRC
+
+*** 解压文件
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-un7z (filename todir encryption &optional password)
+  (if (not encryption)
+      (shell-command (concat "7z.exe x " filename " -o\"" todir
+                             "\""))
+    (shell-command (concat "7z.exe x " filename " -p" password
+                           " -o\"" todir "\""))))
+#+END_SRC
+*** 压缩文件
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-7z (filename 7zfilename encryption &optional
+                           password)
+  (if (not encryption)
+      (shell-command (concat "7z.exe a " 7zfilename " -mx0  \""
+                             filename "\""))
+    (shell-command (concat "7z.exe a " 7zfilename " -p" password
+                           " -mx=0 -mhe=on \"" filename "\""))))
+
+#+END_SRC
+*** 压缩文件-自释放
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-7zexe (filename 7zfilename encryption &optional
+                              password)
+  (if (not encryption)
+      (shell-command (concat "7z.exe a -sfx " 7zfilename " \""
+                             filename "\""))
+    (shell-command (concat "7z.exe a -sfx " 7zfilename " -p"
+                           password " -mhe=on \"" filename "\""))))
+
+#+END_SRC
+** 删除emacs-config.el
+#+BEGIN_SRC emacs-lisp
+(defun ab9986-update-emacs-config-el ()
+  (when (file-exists-p emacs-config-el-path)
+    (delete-file emacs-config-el-path))
+  (org-babel-tangle-file emacs-config-org-path
+                         emacs-config-el-path "emacs-lisp")
+  (byte-compile-file emacs-config-el-path))
+#+END_SRC
+
+** 指定自定义配置
+#+BEGIN_SRC emacs-lisp
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file))
+#+END_SRC
+*** 自定义脚本用法
+可以在custom.el中添加
+(setq ab9986-first-dir "Y:")
+
+* 结尾 
+增加emacs-config结尾语句
+#+BEGIN_SRC emacs-lisp
+(provide 'emacs-config)
+#+END_SRC
+
